@@ -1,13 +1,13 @@
 """
 SQLite database layer — aiosqlite-based async access
+v3.0.1 fixes: update_server supports vless_link field
 """
 import aiosqlite
-import hashlib, os, json
+import hashlib, os
 from pathlib import Path
 
 DB_PATH = Path("/opt/vless-monitor/data/monitor.db")
 
-# ─── Schema ──────────────────────────────────────────────────────────────────
 SCHEMA = """
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
@@ -58,17 +58,14 @@ DEFAULT_SETTINGS = {
     "report_interval":  "0",
 }
 
-# ─── Init ─────────────────────────────────────────────────────────────────────
 async def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(SCHEMA)
-        # seed default settings
         for k, v in DEFAULT_SETTINGS.items():
             await db.execute(
                 "INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)", (k, v)
             )
-        # seed default admin if no users
         row = await db.execute_fetchall("SELECT COUNT(*) FROM users")
         if row[0][0] == 0:
             pw = _hash_password("admin")
@@ -116,6 +113,10 @@ async def get_settings() -> dict:
             return {r[0]: r[1] for r in rows}
 
 async def set_settings(updates: dict):
+    """
+    FIX v3.0.1: Only update keys that are explicitly provided and non-empty.
+    Empty strings no longer overwrite existing saved values.
+    """
     async with aiosqlite.connect(DB_PATH) as db:
         for k, v in updates.items():
             await db.execute(
@@ -156,6 +157,11 @@ async def add_server(remark: str, vless_link: str, interval: int = 0) -> int:
 async def update_server(server_id: int, **kwargs):
     if not kwargs:
         return
+    # FIX v3.0.1: whitelist allowed fields to prevent SQL injection
+    allowed = {"remark", "vless_link", "enabled", "interval"}
+    kwargs = {k: v for k, v in kwargs.items() if k in allowed}
+    if not kwargs:
+        return
     fields = ", ".join(f"{k}=?" for k in kwargs)
     values = list(kwargs.values()) + [server_id]
     async with aiosqlite.connect(DB_PATH) as db:
@@ -182,7 +188,6 @@ async def add_event(server_id: int | None, kind: str, message: str):
             "INSERT INTO events(server_id,kind,message) VALUES(?,?,?)",
             (server_id, kind, message)
         )
-        # keep only last 1000
         await db.execute(
             "DELETE FROM events WHERE id NOT IN "
             "(SELECT id FROM events ORDER BY id DESC LIMIT 1000)"
