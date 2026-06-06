@@ -20,7 +20,7 @@ _die() { echo -e "  ${RED}[✗]${NC} $1"; exit 1; }
 
 clear; echo -e "${CYN}${BLD}"
 echo "  ╔═══════════════════════════════════════════════╗"
-echo "  ║   ▣  VLESS Monitor v3.0.1 — Setup            ║"
+echo "  ║   ▣  VLESS Monitor v3.00.1 — Setup            ║"
 echo "  ╚═══════════════════════════════════════════════╝"
 echo -e "${NC}\n  Ubuntu 24.04 LTS\n"
 
