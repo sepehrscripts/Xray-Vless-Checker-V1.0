@@ -330,4 +330,3 @@ async def api_change_password(body: PasswordBody, request: Request):
     from db.models import update_password
     await update_password(username, body.new)
     return {"ok": True}
-
