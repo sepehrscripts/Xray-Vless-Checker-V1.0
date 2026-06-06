@@ -1,1 +1,544 @@
 
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VLESS Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root[data-theme="dark"]{--bg:#0a0c0f;--bg2:#111318;--bg3:#181c23;--bg4:#1e2330;--border:#1e2330;--border2:#252b3a;--green:#00e5a0;--gdim:#00e5a018;--red:#ff3b5c;--rdim:#ff3b5c18;--yellow:#ffc043;--ydim:#ffc04318;--blue:#3b82f6;--bdim:#3b82f618;--text:#e2e8f0;--t2:#8892a4;--t3:#4a5568;--sh:0 4px 24px #0006}
+:root[data-theme="light"]{--bg:#f0f2f5;--bg2:#fff;--bg3:#f8f9fb;--bg4:#eef0f4;--border:#e2e6ed;--border2:#d0d5de;--green:#00a572;--gdim:#00a57215;--red:#d9264a;--rdim:#d9264a15;--yellow:#c4880a;--ydim:#c4880a15;--blue:#2563eb;--bdim:#2563eb15;--text:#1a202c;--t2:#4a5568;--t3:#a0aec0;--sh:0 4px 24px #0001}
+:root{--mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif}
+html{font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden;transition:background .2s,color .2s}
+
+/* ── Layout ── */
+.layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo-wrap{padding:22px 22px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.logo-mark{font-family:var(--mono);font-size:1.15rem;font-weight:700;color:var(--green)}
+.logo-sub{font-size:.62rem;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-top:3px}
+.theme-btn{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t2);flex-shrink:0;transition:all .15s}
+.theme-btn:hover{color:var(--yellow);border-color:var(--yellow)}
+nav{padding:14px 10px;flex:1}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 13px;border-radius:8px;cursor:pointer;color:var(--t2);font-size:.83rem;font-weight:600;transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+.ni:hover{background:var(--bg3);color:var(--text)}
+.ni.active{background:var(--gdim);color:var(--green)}
+.ni svg{width:15px;height:15px;flex-shrink:0}
+.sidebar-foot{padding:14px 20px;border-top:1px solid var(--border)}
+.last-chk{font-size:.65rem;color:var(--t3);font-family:var(--mono)}
+.logout-btn{display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--t2);cursor:pointer;background:none;border:none;padding:8px 0;width:100%;margin-top:8px;transition:color .15s}
+.logout-btn:hover{color:var(--red)}
+main{padding:26px 30px;overflow-y:auto}
+.page{display:none}.page.active{display:block}
+
+/* ── Headings ── */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.page-title{font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:9px}
+.badge{font-size:.62rem;font-family:var(--mono);background:var(--bg3);border:1px solid var(--border2);padding:2px 8px;border-radius:20px;color:var(--t3)}
+
+/* ── Summary cards ── */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-bottom:26px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;box-shadow:var(--sh)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.card.g::before{background:var(--green)}.card.r::before{background:var(--red)}.card.b::before{background:var(--blue)}
+.cl{font-size:.64rem;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px}
+.cv{font-size:1.9rem;font-weight:700;font-family:var(--mono);line-height:1}
+.card.g .cv{color:var(--green)}.card.r .cv{color:var(--red)}.card.b .cv{color:var(--blue)}
+
+/* ── Server grid ── */
+.srv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:13px}
+.srv-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;transition:transform .15s,border-color .2s;position:relative;overflow:hidden;box-shadow:var(--sh)}
+.srv-card:hover{transform:translateY(-2px)}
+.srv-card.up{border-color:color-mix(in srgb,var(--green) 22%,transparent)}
+.srv-card.down{border-color:color-mix(in srgb,var(--red) 22%,transparent)}
+.srv-card.down::after{content:'';position:absolute;inset:0;background:var(--rdim);pointer-events:none}
+.sc-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px}
+.sc-name{font-weight:700;font-size:.88rem;word-break:break-all}
+.sc-pill{display:flex;align-items:center;gap:5px;font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.sc-pill.up{background:var(--gdim);color:var(--green)}.sc-pill.down{background:var(--rdim);color:var(--red)}
+.pulse{width:6px;height:6px;border-radius:50%}
+.pulse.up{background:var(--green);animation:ping 1.5s infinite}.pulse.down{background:var(--red)}
+@keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--green) 55%,transparent)}70%{box-shadow:0 0 0 5px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.chk-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin:9px 0}
+.chk{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:6px 9px}
+.chk-lbl{font-size:.58rem;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px}
+.chk-val{font-family:var(--mono);font-size:.76rem;font-weight:600}
+.chk-val.ok{color:var(--green)}.chk-val.fail{color:var(--red)}
+.loc-row{display:flex;align-items:center;gap:5px;margin-top:7px;font-size:.72rem;color:var(--t2);flex-wrap:wrap}
+.sc-ts{font-size:.63rem;color:var(--t3);margin-top:6px}
+
+/* ── Servers list table ── */
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--sh)}
+table{width:100%;border-collapse:collapse}
+th{font-size:.68rem;text-transform:uppercase;letter-spacing:1px;color:var(--t3);padding:10px 16px;text-align:left;background:var(--bg3);border-bottom:1px solid var(--border)}
+td{padding:10px 16px;border-bottom:1px solid var(--border);font-size:.82rem;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3)}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.status-dot.up{background:var(--green)}.status-dot.down{background:var(--red)}.status-dot.unknown{background:var(--t3)}
+.toggle{position:relative;width:36px;height:20px}
+.toggle input{opacity:0;width:0;height:0}
+.tslider{position:absolute;inset:0;background:var(--bg4);border:1px solid var(--border2);border-radius:20px;cursor:pointer;transition:.2s}
+.tslider::before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:var(--t3);border-radius:50%;transition:.2s}
+.toggle input:checked+.tslider{background:var(--gdim);border-color:var(--green)}
+.toggle input:checked+.tslider::before{transform:translateX(16px);background:var(--green)}
+.act-btn{background:none;border:none;cursor:pointer;color:var(--t2);padding:4px 7px;border-radius:5px;transition:all .15s;font-size:.8rem}
+.act-btn:hover.edit{color:var(--blue)}.act-btn:hover.del{color:var(--red)}
+
+/* ── Events ── */
+.ev-list{display:flex;flex-direction:column;gap:5px}
+.ev-item{display:grid;grid-template-columns:148px 68px 1fr;gap:10px;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 14px}
+.ev-ts{font-family:var(--mono);color:var(--t3);font-size:.68rem}
+.ev-k{font-size:.66rem;font-weight:700;padding:2px 7px;border-radius:4px;text-align:center;text-transform:uppercase;letter-spacing:.5px}
+.ev-k.up{background:var(--gdim);color:var(--green)}.ev-k.down{background:var(--rdim);color:var(--red)}
+.ev-k.system{background:var(--bdim);color:var(--blue)}.ev-k.error,.ev-k.telegram_error{background:var(--ydim);color:var(--yellow)}
+.ev-msg{color:var(--t2);font-size:.8rem}.ev-srv{color:var(--text);font-weight:600}
+
+/* ── Settings ── */
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.sbox{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:var(--sh)}
+.sbox.full{grid-column:1/-1}
+.stitle{font-size:.68rem;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.field{margin-bottom:13px}.field label{display:block;font-size:.76rem;color:var(--t2);margin-bottom:5px;font-weight:600}
+.field input,.field textarea,.field select{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--mono);font-size:.82rem;outline:none;transition:border-color .15s;resize:vertical}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--gdim)}
+.fhint{font-size:.66rem;color:var(--t3);margin-top:4px}
+
+/* ── Interval quick btns ── */
+.int-row{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:9px}
+.ib{background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:6px 4px;font-size:.76rem;font-family:var(--mono);font-weight:600;cursor:pointer;color:var(--t2);transition:all .15s;text-align:center}
+.ib:hover,.ib.active{background:var(--gdim);border-color:var(--green);color:var(--green)}
+
+/* ── Proxy mode tabs ── */
+.mtabs{display:flex;gap:5px;margin-bottom:14px;flex-wrap:wrap}
+.mtab{padding:6px 13px;border-radius:7px;border:1px solid var(--border2);background:var(--bg3);color:var(--t2);font-size:.76rem;font-weight:600;cursor:pointer;transition:all .15s}
+.mtab:hover{color:var(--text)}.mtab.active{background:var(--gdim);border-color:var(--green);color:var(--green)}
+.mpanel{display:none}.mpanel.show{display:block}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ── Xray pill ── */
+.xpill{display:inline-flex;align-items:center;gap:6px;font-size:.73rem;font-weight:600;padding:4px 11px;border-radius:20px;margin-bottom:12px}
+.xpill.on{background:var(--gdim);color:var(--green)}.xpill.off{background:var(--rdim);color:var(--red)}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:8px;border:none;font-family:var(--sans);font-size:.81rem;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-p{background:var(--green);color:#0a0c0f}.btn-p:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn-s{background:var(--bg3);color:var(--t2);border:1px solid var(--border2)}.btn-s:hover{color:var(--text);border-color:var(--t3)}
+.btn-r{background:var(--rdim);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 30%,transparent)}.btn-r:hover{background:color-mix(in srgb,var(--red) 20%,transparent)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.act-row{display:flex;gap:8px}
+.spin{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Modal ── */
+.modal-bg{position:fixed;inset:0;background:#0009;z-index:100;display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:28px;width:100%;max-width:480px;box-shadow:0 20px 60px #0009}
+.modal-title{font-size:.95rem;font-weight:700;margin-bottom:20px}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:10px 18px;font-size:.81rem;color:var(--text);z-index:999;transition:transform .3s cubic-bezier(.175,.885,.32,1.275);box-shadow:var(--sh)}
+.toast.show{transform:translateX(-50%) translateY(0)}.toast.ok{border-color:var(--green);color:var(--green)}.toast.err{border-color:var(--red);color:var(--red)}
+
+/* ── Empty ── */
+.empty{text-align:center;padding:48px 20px;color:var(--t3)}
+.empty-icon{font-size:2rem;margin-bottom:10px}.empty-text{font-size:.83rem}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}.sidebar{display:none}.cards{grid-template-columns:1fr 1fr}.sg{grid-template-columns:1fr}.ev-item{grid-template-columns:100px 54px 1fr}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo-wrap">
+      <div><div class="logo-mark">▣ VLESS</div><div class="logo-sub">Monitor v3</div></div>
+      <button class="theme-btn" onclick="toggleTheme()">
+        <svg id="themeIcon" width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
+    </div>
+    <nav>
+      <button class="ni active" onclick="nav('dashboard',this)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>Dashboard</button>
+      <button class="ni" onclick="nav('servers',this)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" stroke-width="2"/><rect x="2" y="14" width="20" height="8" rx="2" stroke-width="2"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="18" r="1" fill="currentColor"/></svg>Servers</button>
+      <button class="ni" onclick="nav('events',this)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>Events</button>
+      <button class="ni" onclick="nav('settings',this)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path stroke-width="2" d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="last-chk" id="lastChk">Last check: —</div>
+      <button class="logout-btn" onclick="logout()"><svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>Logout</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- Dashboard -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div class="page-title">Server Status</div>
+        <button class="btn btn-s" id="chkBtn" onclick="checkNow()"><svg id="chkIcon" width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline stroke-width="2.5" points="23 4 23 10 17 10"/><path stroke-width="2.5" d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Check Now</button>
+      </div>
+      <div class="cards">
+        <div class="card b"><div class="cl">Total</div><div class="cv" id="cTotal">—</div></div>
+        <div class="card g"><div class="cl">Online</div><div class="cv" id="cUp">—</div></div>
+        <div class="card r"><div class="cl">Offline</div><div class="cv" id="cDown">—</div></div>
+      </div>
+      <div class="srv-grid" id="srvGrid"><div class="empty"><div class="empty-icon">📡</div><div class="empty-text">No servers yet.</div></div></div>
+    </div>
+
+    <!-- Servers -->
+    <div class="page" id="page-servers">
+      <div class="page-header">
+        <div class="page-title">Servers <span class="badge" id="srvCount">0</span></div>
+        <button class="btn btn-p" onclick="openAddModal()">＋ Add Server</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Status</th><th>Remark</th><th>Host</th><th>TCP</th><th>ICMP</th><th>HTTP</th><th>Location</th><th>Enabled</th><th>Actions</th></tr></thead>
+          <tbody id="srvTable"><tr><td colspan="9" style="text-align:center;color:var(--t3);padding:30px">No servers.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Events -->
+    <div class="page" id="page-events">
+      <div class="page-header">
+        <div class="page-title">Events <span class="badge" id="evCount">0</span></div>
+        <button class="btn btn-s" onclick="loadEvents()">↺ Refresh</button>
+      </div>
+      <div class="ev-list" id="evList"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No events yet.</div></div></div>
+    </div>
+
+    <!-- Settings -->
+    <div class="page" id="page-settings">
+      <div class="page-header"><div class="page-title">Settings</div></div>
+      <div class="sg">
+        <div class="sbox">
+          <div class="stitle">Telegram</div>
+          <div class="field"><label>Bot Token</label><input type="text" id="tgToken" placeholder="1234567890:AAH..."><div class="fhint">From @BotFather</div></div>
+          <div class="field"><label>Chat ID</label><input type="text" id="tgChatId" placeholder="-100... or @username"><div class="fhint">From @userinfobot</div></div>
+          <div class="field"><label>Periodic Report Interval (seconds, 0 = off)</label><input type="number" id="reportInt" value="0" min="0"></div>
+          <div class="btn-row"><button class="btn btn-s" onclick="testTg()">📨 Test</button></div>
+        </div>
+        <div class="sbox">
+          <div class="stitle">Check Interval</div>
+          <div class="int-row">
+            <button class="ib" onclick="setInt(60)">1m</button>
+            <button class="ib" onclick="setInt(300)">5m</button>
+            <button class="ib" onclick="setInt(900)">15m</button>
+            <button class="ib" onclick="setInt(1800)">30m</button>
+          </div>
+          <div class="field"><label>Custom (seconds)</label><input type="number" id="cfgInt" value="300" min="30" oninput="syncIBtns()"></div>
+          <div class="field"><label>Connection Timeout (seconds)</label><input type="number" id="cfgTo" value="10" min="3"></div>
+        </div>
+        <div class="sbox full">
+          <div class="stitle">Telegram Proxy</div>
+          <div class="mtabs">
+            <button class="mtab active" onclick="setMode('none',this)">No Proxy</button>
+            <button class="mtab" onclick="setMode('socks5',this)">SOCKS5</button>
+            <button class="mtab" onclick="setMode('http',this)">HTTP</button>
+            <button class="mtab" onclick="setMode('vless',this)">VLESS Link</button>
+          </div>
+          <div class="mpanel" id="mp-socks5">
+            <div class="two-col">
+              <div class="field"><label>Host</label><input type="text" id="pHost" placeholder="127.0.0.1"></div>
+              <div class="field"><label>Port</label><input type="number" id="pPort" placeholder="1080"></div>
+              <div class="field"><label>Username (optional)</label><input type="text" id="pUser"></div>
+              <div class="field"><label>Password (optional)</label><input type="password" id="pPass"></div>
+            </div>
+          </div>
+          <div class="mpanel" id="mp-http">
+            <div class="two-col">
+              <div class="field"><label>Host</label><input type="text" id="pHostH" placeholder="proxy.example.com"></div>
+              <div class="field"><label>Port</label><input type="number" id="pPortH" placeholder="8080"></div>
+            </div>
+          </div>
+          <div class="mpanel" id="mp-vless">
+            <div id="xpill" class="xpill off">⬤ Xray not running</div>
+            <div class="field"><label>VLESS Proxy Link</label><input type="text" id="vlessLink" placeholder="vless://uuid@host:443?type=ws&security=tls#Proxy"><div class="fhint">Xray will start a SOCKS5 on 127.0.0.1:10808</div></div>
+          </div>
+          <input type="hidden" id="proxyMode" value="none">
+        </div>
+        <div class="sbox full">
+          <div class="stitle">Account</div>
+          <div class="two-col">
+            <div class="field"><label>Current Password</label><input type="password" id="curPw"></div>
+            <div class="field"><label>New Password</label><input type="password" id="newPw"></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-s" onclick="changePw()">🔑 Change Password</button></div>
+        </div>
+        <div class="sbox full">
+          <div class="btn-row">
+            <button class="btn btn-p" onclick="saveSettings()">💾 Save All Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add/Edit Server Modal -->
+<div class="modal-bg" id="srvModal">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Add Server</div>
+    <input type="hidden" id="editId">
+    <div class="field"><label>Remark (Name)</label><input type="text" id="mRemark" placeholder="My Server Germany"></div>
+    <div class="field"><label>VLESS Link</label><textarea id="mLink" rows="3" placeholder="vless://uuid@host:443?type=ws&security=tls#Remark"></textarea></div>
+    <div class="field"><label>Custom Interval (seconds, 0 = global)</label><input type="number" id="mInterval" value="0" min="0"></div>
+    <div class="btn-row">
+      <button class="btn btn-p" onclick="saveServer()">Save</button>
+      <button class="btn btn-s" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Theme ─────────────────────────────────────────────────────────────────────
+const MOON=`<path stroke-width="2" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>`;
+const SUN=`<circle cx="12" cy="12" r="5" stroke-width="2"/><g stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></g>`;
+function applyTheme(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('themeIcon').innerHTML=t==='dark'?MOON:SUN;localStorage.setItem('vt',t)}
+function toggleTheme(){applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark')}
+applyTheme(localStorage.getItem('vt')||'dark');
+
+// ── Nav ───────────────────────────────────────────────────────────────────────
+function nav(p,btn){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  btn.classList.add('active');
+  if(p==='events')   loadEvents();
+  if(p==='settings') loadSettings();
+  if(p==='servers')  loadSrvTable();
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function flag(cc){if(!cc||cc.length!==2)return'🌐';return String.fromCodePoint(...[...cc.toUpperCase()].map(c=>c.charCodeAt(0)+127397))}
+function toast(m,t='ok'){const el=document.getElementById('toast');el.textContent=m;el.className=`toast ${t} show`;setTimeout(()=>el.classList.remove('show'),3000)}
+async function logout(){await fetch('/api/logout',{method:'POST'});window.location='/login'}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+async function loadStatus(){
+  try{
+    const {servers,summary}=await fetch('/api/status').then(r=>r.json());
+    document.getElementById('cTotal').textContent=summary.total;
+    document.getElementById('cUp').textContent=summary.up;
+    document.getElementById('cDown').textContent=summary.down;
+    const g=document.getElementById('srvGrid');
+    if(!servers.length){g.innerHTML='<div class="empty"><div class="empty-icon">📡</div><div class="empty-text">No servers yet. Add some in the Servers page.</div></div>';return}
+    g.innerHTML=servers.map(s=>{
+      const st=s.ok?'up':'down';
+      const loc=s.location||{};const fl=flag(loc.cc);
+      const tcp=s.tcp||{};const icmp=s.icmp||{};const http=s.http||{};
+      return`<div class="srv-card ${st}">
+        <div class="sc-hd"><div class="sc-name">${esc(s.remark)}</div><div class="sc-pill ${st}"><span class="pulse ${st}"></span>${s.ok?'Online':'Offline'}</div></div>
+        <div style="font-family:var(--mono);font-size:.72rem;color:var(--t3);margin-bottom:7px">${esc(s.host)}:${s.port}</div>
+        <div class="chk-row">
+          <div class="chk"><div class="chk-lbl">TCP</div><div class="chk-val ${tcp.ok?'ok':'fail'}">${tcp.ok?'✓':'✗'} ${tcp.ms||0}ms</div></div>
+          <div class="chk"><div class="chk-lbl">ICMP</div><div class="chk-val ${icmp.ok?'ok':'fail'}">${icmp.ok?'✓':'✗'} ${icmp.ms||0}ms</div></div>
+          <div class="chk"><div class="chk-lbl">HTTP</div><div class="chk-val ${http.ok?'ok':'fail'}">${http.ok?'✓':'✗'} ${http.ms||0}ms</div></div>
+        </div>
+        <div class="loc-row"><span>${fl}</span><span>${esc(loc.city?loc.city+', ':'')}${esc(loc.country||'—')}</span>${loc.isp?`<span style="color:var(--t3)">· ${esc(loc.isp)}</span>`:''}
+        </div>
+        <div class="sc-ts">${s.ts||'—'}</div>
+      </div>`}).join('');
+    document.getElementById('lastChk').textContent='Last: '+new Date().toLocaleTimeString();
+  }catch(e){console.error(e)}
+}
+
+async function checkNow(){
+  const btn=document.getElementById('chkBtn');const ic=document.getElementById('chkIcon');
+  btn.disabled=true;ic.classList.add('spin');
+  try{await fetch('/api/check_now',{method:'POST'});toast('Check started…');setTimeout(loadStatus,2500)}
+  finally{btn.disabled=false;ic.classList.remove('spin')}
+}
+
+// ── Servers table ─────────────────────────────────────────────────────────────
+async function loadSrvTable(){
+  try{
+    const rows=await fetch('/api/servers').then(r=>r.json());
+    document.getElementById('srvCount').textContent=rows.length;
+    const tb=document.getElementById('srvTable');
+    if(!rows.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:30px">No servers.</td></tr>';return}
+
+    // merge with status cache
+    const statusMap={};
+    try{const s=await fetch('/api/status').then(r=>r.json());s.servers.forEach(x=>statusMap[x.server_id]=x)}catch(e){}
+
+    tb.innerHTML=rows.map(r=>{
+      const s=statusMap[r.id]||{};
+      const st=r.last_status==='UP'?'up':r.last_status==='DOWN'?'down':'unknown';
+      const loc=s.location||{};
+      return`<tr>
+        <td><span class="status-dot ${st}"></span></td>
+        <td style="font-weight:600">${esc(r.remark)}</td>
+        <td style="font-family:var(--mono);font-size:.76rem;color:var(--t2)">${esc(s.host||'—')}:${s.port||''}</td>
+        <td><span class="${s.tcp?.ok?'chk-val ok':'chk-val fail'}">${s.tcp?`${s.tcp.ok?'✓':'✗'} ${s.tcp.ms}ms`:'—'}</span></td>
+        <td><span class="${s.icmp?.ok?'chk-val ok':'chk-val fail'}">${s.icmp?`${s.icmp.ok?'✓':'✗'} ${s.icmp.ms}ms`:'—'}</span></td>
+        <td><span class="${s.http?.ok?'chk-val ok':'chk-val fail'}">${s.http?`${s.http.ok?'✓':'✗'} ${s.http.ms}ms`:'—'}</span></td>
+        <td style="font-size:.75rem;color:var(--t2)">${loc.country?flag(loc.cc)+' '+loc.city+', '+loc.country:'—'}</td>
+        <td><label class="toggle"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleSrv(${r.id},this.checked)"><span class="tslider"></span></label></td>
+        <td><div class="act-row">
+          <button class="act-btn edit" onclick="openEditModal(${r.id},'${esc(r.remark)}',\`${esc(r.vless_link)}\`,${r.interval})">✏️</button>
+          <button class="act-btn del" onclick="deleteSrv(${r.id},'${esc(r.remark)}')">🗑️</button>
+        </div></td>
+      </tr>`}).join('');
+  }catch(e){console.error(e)}
+}
+
+async function toggleSrv(id,enabled){
+  await fetch(`/api/servers/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});
+}
+
+async function deleteSrv(id,name){
+  if(!confirm(`Delete "${name}"?`))return;
+  await fetch(`/api/servers/${id}`,{method:'DELETE'});
+  toast(`Deleted ${name}`);
+  loadSrvTable();
+}
+
+// ── Server modal ──────────────────────────────────────────────────────────────
+function openAddModal(){
+  document.getElementById('modalTitle').textContent='Add Server';
+  document.getElementById('editId').value='';
+  document.getElementById('mRemark').value='';
+  document.getElementById('mLink').value='';
+  document.getElementById('mInterval').value='0';
+  document.getElementById('srvModal').classList.add('show');
+}
+
+function openEditModal(id,remark,link,interval){
+  document.getElementById('modalTitle').textContent='Edit Server';
+  document.getElementById('editId').value=id;
+  document.getElementById('mRemark').value=remark;
+  document.getElementById('mLink').value=link;
+  document.getElementById('mInterval').value=interval;
+  document.getElementById('srvModal').classList.add('show');
+}
+
+function closeModal(){document.getElementById('srvModal').classList.remove('show')}
+
+async function saveServer(){
+  const id=document.getElementById('editId').value;
+  const remark=document.getElementById('mRemark').value.trim();
+  const link=document.getElementById('mLink').value.trim();
+  const interval=parseInt(document.getElementById('mInterval').value)||0;
+  if(!remark||!link){toast('Remark and VLESS link required','err');return}
+
+  if(id){
+    await fetch(`/api/servers/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({remark,interval})});
+    toast('Server updated');
+  }else{
+    await fetch('/api/servers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({remark,vless_link:link,interval})});
+    toast('Server added');
+  }
+  closeModal();loadSrvTable();
+}
+
+// ── Events ────────────────────────────────────────────────────────────────────
+async function loadEvents(){
+  try{
+    const evts=await fetch('/api/events?limit=150').then(r=>r.json());
+    document.getElementById('evCount').textContent=evts.length;
+    const el=document.getElementById('evList');
+    if(!evts.length){el.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No events yet.</div></div>';return}
+    const KL={up:'UP',down:'DOWN',system:'SYS',error:'ERR',telegram_error:'TG'};
+    el.innerHTML=evts.map(e=>`<div class="ev-item">
+      <span class="ev-ts">${e.ts}</span>
+      <span class="ev-k ${e.kind}">${KL[e.kind]||e.kind}</span>
+      <span class="ev-msg">${e.remark?`<span class="ev-srv">${esc(e.remark)}</span> — `:''}${esc(e.message)}</span>
+    </div>`).join('');
+  }catch(e){console.error(e)}
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function setInt(v){document.getElementById('cfgInt').value=v;syncIBtns()}
+function syncIBtns(){const v=parseInt(document.getElementById('cfgInt').value)||0;const m={60:0,300:1,900:2,1800:3};document.querySelectorAll('.ib').forEach((b,i)=>b.classList.toggle('active',m[v]===i))}
+function setMode(mode,btn){
+  document.getElementById('proxyMode').value=mode;
+  document.querySelectorAll('.mtab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.mpanel').forEach(p=>p.classList.remove('show'));
+  const p=document.getElementById(`mp-${mode}`);
+  if(p)p.classList.add('show');
+  if(mode==='vless')loadXrayStatus();
+}
+
+async function loadXrayStatus(){
+  try{
+    const d=await fetch('/api/xray_status').then(r=>r.json());
+    const pill=document.getElementById('xpill');if(!pill)return;
+    if(d.running){pill.className='xpill on';pill.textContent=`⬤ Xray running — SOCKS5 :${d.port}`}
+    else{pill.className='xpill off';pill.textContent='⬤ Xray not running'}
+  }catch(e){}
+}
+
+async function loadSettings(){
+  try{
+    const cfg=await fetch('/api/settings').then(r=>r.json());
+    document.getElementById('tgToken').value=cfg.telegram_token||'';
+    document.getElementById('tgChatId').value=cfg.telegram_chat_id||'';
+    document.getElementById('reportInt').value=cfg.report_interval||0;
+    document.getElementById('cfgInt').value=cfg.interval||300;
+    document.getElementById('cfgTo').value=cfg.timeout||10;
+    document.getElementById('vlessLink').value=cfg.vless_link||'';
+    document.getElementById('pHost').value=cfg.proxy_host||'';
+    document.getElementById('pPort').value=cfg.proxy_port||'';
+    document.getElementById('pUser').value=cfg.proxy_user||'';
+    document.getElementById('pPass').value=cfg.proxy_pass||'';
+    document.getElementById('pHostH').value=cfg.proxy_host||'';
+    document.getElementById('pPortH').value=cfg.proxy_port||'';
+    const mode=cfg.proxy_mode||'none';
+    document.getElementById('proxyMode').value=mode;
+    document.querySelectorAll('.mtab').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase().replace(' ','')===mode||(b.textContent==='No Proxy'&&mode==='none')));
+    document.querySelectorAll('.mpanel').forEach(p=>p.classList.remove('show'));
+    const mp=document.getElementById(`mp-${mode}`);if(mp)mp.classList.add('show');
+    syncIBtns();
+    if(mode==='vless')loadXrayStatus();
+  }catch(e){console.error(e)}
+}
+
+async function saveSettings(){
+  const mode=document.getElementById('proxyMode').value;
+  let phost='',pport='',puser='',ppass='';
+  if(mode==='socks5'){phost=document.getElementById('pHost').value.trim();pport=document.getElementById('pPort').value.trim();puser=document.getElementById('pUser').value.trim();ppass=document.getElementById('pPass').value}
+  if(mode==='http'){phost=document.getElementById('pHostH').value.trim();pport=document.getElementById('pPortH').value.trim()}
+  const body={
+    telegram_token:   document.getElementById('tgToken').value.trim(),
+    telegram_chat_id: document.getElementById('tgChatId').value.trim(),
+    report_interval:  parseInt(document.getElementById('reportInt').value)||0,
+    interval:         parseInt(document.getElementById('cfgInt').value)||300,
+    timeout:          parseInt(document.getElementById('cfgTo').value)||10,
+    proxy_mode:mode, proxy_host:phost, proxy_port:pport, proxy_user:puser, proxy_pass:ppass,
+    vless_link:document.getElementById('vlessLink').value.trim(),
+  };
+  try{
+    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    toast('Settings saved ✓');
+    setTimeout(loadXrayStatus,2000);
+  }catch(e){toast('Save failed','err')}
+}
+
+async function testTg(){await saveSettings();try{await fetch('/api/test_telegram',{method:'POST'});toast('Test sent!')}catch(e){toast('Failed','err')}}
+
+async function changePw(){
+  const cur=document.getElementById('curPw').value;
+  const nw=document.getElementById('newPw').value;
+  if(!cur||!nw){toast('Fill both fields','err');return}
+  try{
+    const r=await fetch('/api/change_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current:cur,new:nw})});
+    if(r.ok){toast('Password changed');document.getElementById('curPw').value='';document.getElementById('newPw').value=''}
+    else{const d=await r.json();toast(d.detail||'Error','err')}
+  }catch(e){toast('Error','err')}
+}
+
+// ── Modal close on bg click ───────────────────────────────────────────────────
+document.getElementById('srvModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal()});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadStatus();
+setInterval(loadStatus,15000);
+setInterval(()=>{if(document.getElementById('page-settings').classList.contains('active'))loadXrayStatus()},5000);
+</script>
+</body>
+</html>
