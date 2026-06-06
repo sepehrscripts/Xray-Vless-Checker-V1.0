@@ -149,4 +149,3 @@ async def poll_updates(token: str, chat_id: str, proxy: str | None,
         except Exception as e:
             log.error("Poll error: %s", e)
             await asyncio.sleep(5)
-
