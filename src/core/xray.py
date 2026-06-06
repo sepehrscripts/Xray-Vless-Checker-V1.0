@@ -164,4 +164,3 @@ async def watchdog(vless_link: str):
         if vless_link and not is_running():
             log.warning("Xray died, restarting...")
             await start(vless_link)
-
