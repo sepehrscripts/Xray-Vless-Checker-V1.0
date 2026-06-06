@@ -160,4 +160,3 @@ async def check_all(servers: list[dict], timeout: float, proxy_url: str | None =
             return await check_server(srv, timeout, proxy_url)
 
     return await asyncio.gather(*[_guarded(s) for s in servers])
-
