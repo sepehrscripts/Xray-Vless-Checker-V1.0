@@ -37,7 +37,7 @@
 ## ✦ نصب سریع
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/USERNAME/vless-monitor/main/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/sepehrscripts/Xray-Vless-Checker-V1.0/main/install.sh)
 ```
 
 > نیاز به `sudo` یا اجرا با کاربر `root` داری.
