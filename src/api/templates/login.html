@@ -1,1 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VLESS Monitor — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root[data-theme="dark"]{--bg:#0a0c0f;--bg2:#111318;--border:#1e2330;--green:#00e5a0;--green-dim:#00e5a018;--red:#ff3b5c;--text:#e2e8f0;--text2:#8892a4;--text3:#4a5568}
+:root[data-theme="light"]{--bg:#f0f2f5;--bg2:#ffffff;--border:#e2e6ed;--green:#00a572;--green-dim:#00a57215;--red:#d9264a;--text:#1a202c;--text2:#4a5568;--text3:#a0aec0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 8px 40px #0006}
+.logo{text-align:center;margin-bottom:32px}
+.logo-mark{font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;color:var(--green)}
+.logo-sub{font-size:.75rem;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-top:4px}
+.field{margin-bottom:18px}
+.field label{display:block;font-size:.8rem;color:var(--text2);margin-bottom:6px;font-weight:600}
+.field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px 14px;color:var(--text);font-size:.9rem;outline:none;transition:border-color .15s}
+.field input:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-dim)}
+.btn{width:100%;padding:12px;background:var(--green);color:#0a0c0f;border:none;border-radius:9px;font-size:.9rem;font-weight:700;cursor:pointer;transition:all .15s;margin-top:8px}
+.btn:hover{filter:brightness(1.08)}
+.err{background:#ff3b5c18;border:1px solid #ff3b5c44;color:var(--red);padding:10px 14px;border-radius:8px;font-size:.82rem;margin-bottom:16px;display:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-mark">▣ VLESS</div>
+    <div class="logo-sub">Monitor v3</div>
+  </div>
+  <div class="err" id="err"></div>
+  <div class="field"><label>Username</label><input type="text" id="username" placeholder="admin" autocomplete="username"></div>
+  <div class="field"><label>Password</label><input type="password" id="password" placeholder="••••••••" autocomplete="current-password"></div>
+  <button class="btn" onclick="login()">Sign In</button>
+</div>
+<script>
+async function login(){
+  const u=document.getElementById('username').value.trim();
+  const p=document.getElementById('password').value;
+  const err=document.getElementById('err');
+  err.style.display='none';
+  try{
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    if(r.ok){window.location='/';}
+    else{const d=await r.json();err.textContent=d.detail||'Invalid credentials';err.style.display='block';}
+  }catch(e){err.textContent='Connection error';err.style.display='block';}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+</script>
+</body>
+</html>
 
