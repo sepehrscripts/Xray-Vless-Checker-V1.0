@@ -55,7 +55,13 @@ _step "Directories ready"
 
 # ── 3. Copy source files from this package ────────────────────────────────────
 _info "Copying source files..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Detect script location robustly (works with bash install.sh and pipe execution)
+if [[ -n "${BASH_SOURCE[0]:-}" && "${BASH_SOURCE[0]}" != "/dev/fd/"* ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+  SCRIPT_DIR="$(pwd)"
+fi
+[ -f "$SCRIPT_DIR/src/main.py" ] || _die "Cannot find source files. Run: cd <extracted_folder> && bash install.sh"
 cp "$SCRIPT_DIR/src/main.py"                        "$INSTALL_DIR/src/"
 cp "$SCRIPT_DIR/src/db/models.py"                   "$INSTALL_DIR/src/db/"
 cp "$SCRIPT_DIR/src/core/checker.py"                "$INSTALL_DIR/src/core/"
