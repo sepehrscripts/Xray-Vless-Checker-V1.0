@@ -62,4 +62,3 @@ def get_current_user(request: Request) -> str:
 
 # init secret on import
 _load_secret()
-
