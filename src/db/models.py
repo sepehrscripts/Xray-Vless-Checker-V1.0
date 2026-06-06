@@ -201,4 +201,3 @@ async def get_events(limit: int = 100, server_id: int | None = None) -> list[dic
         async with db.execute(q, params) as cur:
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
-
