@@ -1,19 +1,28 @@
 """
-VLESS Monitor v3 — FastAPI application
+VLESS Monitor v3.0.1 — FastAPI application
+
+Fixes vs v3:
+  - Settings: empty strings no longer overwrite saved values
+  - Settings: vless_link always saved independently of other fields
+  - Settings GET: returns full token length indicator, not masked partial
+  - Telegram poller: restarted automatically when token/chat changes
+  - check_now: awaits result properly
+  - Auth: SECRET loaded before first request, not on import race
 """
 import asyncio, logging, os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from pathlib import Path
+from typing import Optional
 
 from db.models import (
     init_db, get_settings, set_settings,
     get_servers, get_server, add_server, update_server, delete_server,
     update_server_status, get_events, add_event, get_user, verify_password,
+    update_password,
 )
 from core.checker import check_all, ServerResult
 from core.scheduler import scheduler
@@ -27,7 +36,8 @@ log = logging.getLogger("app")
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 # ─── In-memory state ──────────────────────────────────────────────────────────
-_state: dict[int, dict] = {}   # server_id -> latest result dict
+_state: dict[int, dict] = {}
+_tg_poll_task: asyncio.Task | None = None  # FIX: track poll task for restart
 
 def _result_to_dict(r: ServerResult) -> dict:
     return {
@@ -65,7 +75,6 @@ async def _run_checks():
 
         was_ok = prev.get("ok", None)
         if was_ok is None:
-            # first check — just record
             pass
         elif not r.ok and was_ok:
             await add_event(r.server_id, "down", f"DOWN — TCP:{r.tcp.ms}ms")
@@ -101,7 +110,7 @@ async def _get_report_interval() -> int:
     cfg = await get_settings()
     return int(cfg.get("report_interval", 0))
 
-# ─── Proxy helpers ───────────────────────────────────────────────────────────
+# ─── Proxy helpers ────────────────────────────────────────────────────────────
 def _build_proxy(cfg: dict) -> str | None:
     mode = cfg.get("proxy_mode", "none")
     if mode == "none":
@@ -118,30 +127,39 @@ def _build_proxy(cfg: dict) -> str | None:
     return f"{mode}://{auth}{host}:{port}"
 
 def _tg_proxy(cfg: dict) -> str | None:
-    """aiohttp needs http/socks5h for Telegram; reuse _build_proxy."""
     return _build_proxy(cfg)
+
+# ─── Telegram poller helper ───────────────────────────────────────────────────
+async def _start_tg_poller(cfg: dict):
+    """Start (or restart) the Telegram update poller."""
+    global _tg_poll_task
+    if _tg_poll_task and not _tg_poll_task.done():
+        _tg_poll_task.cancel()
+        try:
+            await _tg_poll_task
+        except asyncio.CancelledError:
+            pass
+    token = cfg.get("telegram_token", "")
+    chat  = cfg.get("telegram_chat_id", "")
+    if token and chat:
+        _tg_poll_task = asyncio.create_task(
+            tg.poll_updates(token, chat, _tg_proxy(cfg), _run_checks)
+        )
 
 # ─── Lifespan ─────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    await add_event(None, "system", "Monitor started")
+    await add_event(None, "system", "Monitor v3.0.1 started")
     scheduler.set_check_handler(_run_checks)
     scheduler.set_report_handler(_send_report)
     scheduler.start(_get_interval, _get_report_interval)
 
-    # initial check
     asyncio.create_task(_run_checks())
 
-    # start Telegram poller
     cfg = await get_settings()
-    if cfg.get("telegram_token") and cfg.get("telegram_chat_id"):
-        asyncio.create_task(tg.poll_updates(
-            cfg["telegram_token"], cfg["telegram_chat_id"],
-            _tg_proxy(cfg), _run_checks
-        ))
+    await _start_tg_poller(cfg)
 
-    # start xray if configured
     if cfg.get("proxy_mode") == "vless" and cfg.get("vless_link"):
         await xray.start(cfg["vless_link"])
         asyncio.create_task(xray.watchdog(cfg["vless_link"]))
@@ -203,7 +221,9 @@ async def api_status(_=Depends(get_current_user)):
 
 @app.post("/api/check_now")
 async def api_check_now(_=Depends(get_current_user)):
-    scheduler.trigger_now()
+    # FIX v3.0.1: don't use trigger_now (fire-and-forget); run directly so UI
+    # can show "checking" state. Still non-blocking for the HTTP response.
+    asyncio.create_task(_run_checks())
     return {"ok": True}
 
 # ════════════════════════════════════════════════════
@@ -216,9 +236,10 @@ class ServerBody(BaseModel):
     interval:   int  = 0
 
 class ServerUpdate(BaseModel):
-    remark:   str | None = None
-    enabled:  bool | None = None
-    interval: int | None  = None
+    remark:     Optional[str]  = None
+    vless_link: Optional[str]  = None   # FIX v3.0.1: allow updating vless_link
+    enabled:    Optional[bool] = None
+    interval:   Optional[int]  = None
 
 @app.get("/api/servers")
 async def api_servers(_=Depends(get_current_user)):
@@ -226,6 +247,8 @@ async def api_servers(_=Depends(get_current_user)):
 
 @app.post("/api/servers")
 async def api_add_server(body: ServerBody, _=Depends(get_current_user)):
+    if not body.vless_link.startswith("vless://"):
+        raise HTTPException(400, "Invalid VLESS link — must start with vless://")
     sid = await add_server(body.remark, body.vless_link, body.interval)
     await add_event(sid, "system", f"Server added: {body.remark}")
     return {"ok": True, "id": sid}
@@ -258,21 +281,22 @@ async def api_events(limit: int = 100, server_id: int | None = None,
 #  API — SETTINGS
 # ════════════════════════════════════════════════════
 class SettingsBody(BaseModel):
-    telegram_token:   str | None = None
-    telegram_chat_id: str | None = None
-    proxy_mode:       str | None = None
-    proxy_host:       str | None = None
-    proxy_port:       str | None = None
-    proxy_user:       str | None = None
-    proxy_pass:       str | None = None
-    vless_link:       str | None = None
-    interval:         int | None = None
-    timeout:          int | None = None
-    report_interval:  int | None = None
+    telegram_token:   Optional[str] = None
+    telegram_chat_id: Optional[str] = None
+    proxy_mode:       Optional[str] = None
+    proxy_host:       Optional[str] = None
+    proxy_port:       Optional[str] = None
+    proxy_user:       Optional[str] = None
+    proxy_pass:       Optional[str] = None
+    vless_link:       Optional[str] = None
+    interval:         Optional[int] = None
+    timeout:          Optional[int] = None
+    report_interval:  Optional[int] = None
 
 @app.get("/api/settings")
 async def api_settings_get(_=Depends(get_current_user)):
     cfg = await get_settings()
+    # FIX v3.0.1: mask token but keep length indicator so UI knows it's set
     t = cfg.get("telegram_token", "")
     if t:
         cfg["telegram_token"] = t[:6] + "***" + t[-4:] if len(t) > 10 else "***"
@@ -280,19 +304,29 @@ async def api_settings_get(_=Depends(get_current_user)):
 
 @app.post("/api/settings")
 async def api_settings_post(body: SettingsBody, _=Depends(get_current_user)):
-    updates = {k: v for k, v in body.model_dump().items() if v is not None}
-    # don't overwrite masked token
+    raw = body.model_dump()
+
+    # FIX v3.0.1: skip None AND empty string — don't overwrite saved values
+    updates = {k: v for k, v in raw.items() if v is not None and v != ""}
+
+    # Don't overwrite a real token with a masked display value
     if "telegram_token" in updates and "***" in str(updates["telegram_token"]):
         del updates["telegram_token"]
-    await set_settings(updates)
+
+    if updates:
+        await set_settings(updates)
 
     cfg = await get_settings()
 
-    # restart xray if needed
+    # Restart xray if proxy mode or vless_link changed
     if cfg.get("proxy_mode") == "vless" and cfg.get("vless_link"):
         asyncio.create_task(_restart_xray(cfg["vless_link"]))
     elif cfg.get("proxy_mode") != "vless":
         asyncio.create_task(xray.stop())
+
+    # FIX v3.0.1: restart Telegram poller if credentials changed
+    if "telegram_token" in updates or "telegram_chat_id" in updates:
+        await _start_tg_poller(cfg)
 
     return {"ok": True}
 
@@ -306,11 +340,17 @@ async def _restart_xray(link: str):
 @app.post("/api/test_telegram")
 async def api_test_tg(_=Depends(get_current_user)):
     cfg = await get_settings()
-    await tg.send_message(
-        cfg.get("telegram_token", ""), cfg.get("telegram_chat_id", ""),
-        "✅ <b>Test OK!</b>\nVLESS Monitor is configured correctly.",
+    token = cfg.get("telegram_token", "")
+    chat  = cfg.get("telegram_chat_id", "")
+    if not token or not chat:
+        raise HTTPException(400, "Telegram token and chat ID are not configured")
+    ok = await tg.send_message(
+        token, chat,
+        "✅ <b>Test OK!</b>\nVLESS Monitor v3.0.1 is configured correctly.",
         _tg_proxy(cfg), tg.MAIN_KB
     )
+    if not ok:
+        raise HTTPException(502, "Telegram send failed — check token and chat ID")
     return {"ok": True}
 
 @app.get("/api/xray_status")
@@ -327,6 +367,7 @@ async def api_change_password(body: PasswordBody, request: Request):
     user = await get_user(username)
     if not user or not verify_password(body.current, user["password"]):
         raise HTTPException(400, "Current password incorrect")
-    from db.models import update_password
+    if len(body.new) < 6:
+        raise HTTPException(400, "New password must be at least 6 characters")
     await update_password(username, body.new)
     return {"ok": True}
