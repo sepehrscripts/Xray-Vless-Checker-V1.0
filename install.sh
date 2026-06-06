@@ -50,12 +50,17 @@ touch "$INSTALL_DIR/src/bot/__init__.py"
 touch "$INSTALL_DIR/src/api/__init__.py"
 _step "Directories ready"
 
-# ── 3. Python venv ────────────────────────────────────────────────────────────
-_info "Setting up Python virtual environment..."
-python3 -m venv "$INSTALL_DIR/venv"
-"$INSTALL_DIR/venv/bin/pip" install -q --upgrade pip
-"$INSTALL_DIR/venv/bin/pip" install -q \
-  fastapi "uvicorn[standard]" aiohttp aiosqlite jinja2 python-multipart
+# ── 3. Python packages via apt ───────────────────────────────────────────────
+_info "Installing Python packages via apt..."
+apt-get install -y -qq \
+  python3-fastapi \
+  python3-uvicorn \
+  python3-aiohttp \
+  python3-aiosqlite \
+  python3-jinja2 \
+  python3-multipart 2>/dev/null || true
+python3 -c "import fastapi, uvicorn, aiohttp, aiosqlite, jinja2" 2>/dev/null || \
+  _die "Python packages missing. Run: apt-get install python3-fastapi python3-uvicorn python3-aiohttp python3-aiosqlite python3-jinja2"
 _step "Python packages installed"
 
 # ── 4. Xray-core ──────────────────────────────────────────────────────────────
@@ -104,7 +109,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=${INSTALL_DIR}/src
-ExecStart=${INSTALL_DIR}/venv/bin/uvicorn main:app --host 0.0.0.0 --port ${PORT} --log-level info
+ExecStart=/usr/bin/uvicorn main:app --host 0.0.0.0 --port ${PORT} --log-level info
 Restart=on-failure
 RestartSec=10
 Environment=PYTHONPATH=${INSTALL_DIR}/src
