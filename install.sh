@@ -1,17 +1,15 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
-#   VLESS Monitor v3 SaaS — One-Line Installer
-#   bash <(curl -Ls https://raw.githubusercontent.com/sepehrscripts/Xray-Vless-Checker-V1.0/main/install.sh)
+#   VLESS Monitor v3.0.1 — Installer
 # ═══════════════════════════════════════════════════════════════
 set -euo pipefail
 
 INSTALL_DIR="/opt/vless-monitor"
 SERVICE="vless-monitor"
 PORT=5000
-REPO="https://raw.githubusercontent.com/sepehrscripts/Xray-Vless-Checker-V1.0/main"
 
 RED='\033[0;31m';GRN='\033[0;32m';YLW='\033[1;33m'
-CYN='\033[0;36m';BLD='\033[1m';DIM='\033[2m';NC='\033[0m'
+CYN='\033[0;36m';BLD='\033[1m';NC='\033[0m'
 _step(){ echo -e "  ${GRN}[+]${NC} $1"; }
 _info(){ echo -e "  ${YLW}[~]${NC} $1"; }
 _warn(){ echo -e "  ${YLW}[!]${NC} $1"; }
@@ -22,11 +20,11 @@ _die() { echo -e "  ${RED}[✗]${NC} $1"; exit 1; }
 
 clear; echo -e "${CYN}${BLD}"
 echo "  ╔═══════════════════════════════════════════════╗"
-echo "  ║   ▣  VLESS Monitor v3 — Production Setup     ║"
+echo "  ║   ▣  VLESS Monitor v3.0.1 — Setup            ║"
 echo "  ╚═══════════════════════════════════════════════╝"
 echo -e "${NC}\n  Ubuntu 24.04 LTS\n"
 
-# Stop old service if running
+# Stop old service
 systemctl stop "$SERVICE" 2>/dev/null||true
 systemctl disable "$SERVICE" 2>/dev/null||true
 systemctl daemon-reload
@@ -34,8 +32,12 @@ systemctl daemon-reload
 # ── 1. System packages ────────────────────────────────────────────────────────
 _info "Installing system packages..."
 apt-get update -qq
-apt-get install -y -qq   python3 curl unzip iputils-ping sqlite3   python3-fastapi python3-uvicorn python3-aiohttp   python3-aiosqlite python3-jinja2 python3-multipart
-python3 -c "import fastapi,uvicorn,aiohttp,aiosqlite,jinja2" 2>/dev/null ||   _die "Python packages missing. Run: apt-get install python3-fastapi"
+apt-get install -y -qq \
+  python3 curl unzip iputils-ping sqlite3 \
+  python3-fastapi python3-uvicorn python3-aiohttp \
+  python3-aiosqlite python3-jinja2 python3-multipart
+python3 -c "import fastapi,uvicorn,aiohttp,aiosqlite,jinja2" 2>/dev/null || \
+  _die "Python packages missing."
 _step "System packages ready"
 
 # ── 2. Directories ────────────────────────────────────────────────────────────
@@ -51,8 +53,21 @@ touch "$INSTALL_DIR/src/bot/__init__.py"
 touch "$INSTALL_DIR/src/api/__init__.py"
 _step "Directories ready"
 
-# ── 3. Python packages (already installed via apt above) ─────────────────────
-_step "Python packages ready"
+# ── 3. Copy source files from this package ────────────────────────────────────
+_info "Copying source files..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cp "$SCRIPT_DIR/src/main.py"                        "$INSTALL_DIR/src/"
+cp "$SCRIPT_DIR/src/db/models.py"                   "$INSTALL_DIR/src/db/"
+cp "$SCRIPT_DIR/src/core/checker.py"                "$INSTALL_DIR/src/core/"
+cp "$SCRIPT_DIR/src/core/xray.py"                   "$INSTALL_DIR/src/core/"
+cp "$SCRIPT_DIR/src/core/scheduler.py"              "$INSTALL_DIR/src/core/"
+cp "$SCRIPT_DIR/src/bot/telegram.py"                "$INSTALL_DIR/src/bot/"
+cp "$SCRIPT_DIR/src/api/auth.py"                    "$INSTALL_DIR/src/api/"
+cp "$SCRIPT_DIR/src/api/app.py"                     "$INSTALL_DIR/src/api/"
+cp "$SCRIPT_DIR/src/api/templates/login.html"       "$INSTALL_DIR/src/api/templates/"
+cp "$SCRIPT_DIR/src/api/templates/index.html"       "$INSTALL_DIR/src/api/templates/"
+cp "$SCRIPT_DIR/cli.py"                             "$INSTALL_DIR/"
+_step "Source files copied"
 
 # ── 4. Xray-core ──────────────────────────────────────────────────────────────
 _info "Downloading Xray-core..."
@@ -73,34 +88,28 @@ else
   _warn "Xray download failed — VLESS proxy will be unavailable"
 fi
 
-# ── 5. Download source files ──────────────────────────────────────────────────
-_info "Downloading source files from GitHub..."
-_dl(){ curl -sfL --retry 2 "$REPO/$1" -o "$INSTALL_DIR/$1" || _warn "Failed: $1"; }
-_dl "src/main.py"
-_dl "src/db/models.py"
-_dl "src/core/checker.py"
-_dl "src/core/xray.py"
-_dl "src/core/scheduler.py"
-_dl "src/bot/telegram.py"
-_dl "src/api/auth.py"
-_dl "src/api/app.py"
-_dl "src/api/templates/login.html"
-_dl "src/api/templates/index.html"
-_dl "cli.py"
-_step "Source files downloaded"
+# ── 5. Find Python3 uvicorn path ─────────────────────────────────────────────
+UVICORN_CMD=""
+if command -v uvicorn &>/dev/null; then
+  UVICORN_CMD="$(command -v uvicorn)"
+else
+  # FIX v3.0.1: fallback to python3 -m uvicorn (apt install doesn't create binary)
+  UVICORN_CMD="/usr/bin/python3 -m uvicorn"
+fi
+_step "Uvicorn: $UVICORN_CMD"
 
 # ── 6. Systemd service ────────────────────────────────────────────────────────
 _info "Installing systemd service..."
 cat > "/etc/systemd/system/${SERVICE}.service" << SVCEOF
 [Unit]
-Description=VLESS Monitor v3 SaaS
+Description=VLESS Monitor v3.0.1 SaaS
 After=network.target
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=${INSTALL_DIR}/src
-ExecStart=/usr/bin/uvicorn main:app --host 0.0.0.0 --port ${PORT} --log-level info
+ExecStart=${UVICORN_CMD} main:app --host 0.0.0.0 --port ${PORT} --log-level info
 Restart=on-failure
 RestartSec=10
 Environment=PYTHONPATH=${INSTALL_DIR}/src
@@ -130,7 +139,7 @@ sleep 2
 IP=$(hostname -I | awk '{print $1}')
 echo ""; echo -e "${GRN}${BLD}"
 echo "  ╔═══════════════════════════════════════════════╗"
-echo "  ║     VLESS Monitor v3 — Ready! ✓              ║"
+echo "  ║     VLESS Monitor v3.0.1 — Ready! ✓          ║"
 echo "  ╚═══════════════════════════════════════════════╝"
 echo -e "${NC}"
 echo -e "  🌐 Web Panel:  ${CYN}http://${IP}:${PORT}${NC}"
