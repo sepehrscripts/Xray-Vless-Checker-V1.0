@@ -60,4 +60,3 @@ class Scheduler:
             asyncio.create_task(self._on_check())
 
 scheduler = Scheduler()
-
